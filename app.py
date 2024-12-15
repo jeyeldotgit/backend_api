@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, send_file
 from flask_bcrypt import Bcrypt
 from flask_session import Session
 from flask_cors import CORS
 from config import ApplicationConfig
 from models import db, User
+import io
 
 app = Flask(__name__)
 app.config.from_object(ApplicationConfig)
@@ -30,7 +31,8 @@ def get_current_user():
     
     return jsonify({
         "id": user.id,
-        "username": user.username
+        "username": user.username,
+        "email": user.email
     })
 
 @app.route("/register", methods=["POST"])
@@ -93,6 +95,8 @@ def login_user():
         
     })
     
+    
+    
 
 @app.route("/logout", methods=["POST"])
 def logout_user():
@@ -102,6 +106,40 @@ def logout_user():
         session.pop("user_id")
     
     return jsonify({"message": "Logged Out Succesfull"}), 200
+
+
+
+@app.route("/generate-cobol-file", methods=["POST"])
+def generate_cobol_file():
+    # Get the transaction data from the frontend
+    transactions = request.json.get("transactions", [])
+    
+    if not isinstance(transactions, list):
+        return "Invalid data format", 400
+    
+    # Start the COBOL output string
+    cobol_output = "COBOL Report\n====================\n"
+    
+    # Iterate over the transactions and build the COBOL print structure
+    for index, tx in enumerate(transactions):
+        removed_status = " (REMOVED)" if tx.get("removed") else ""
+        cobol_output += f"Transaction {index + 1}{removed_status}\n"
+        cobol_output += f"Type: {tx.get('type', 'N/A').upper()}\n"
+        cobol_output += f"Category: {tx.get('category', 'N/A')}\n"
+        cobol_output += f"Amount: {tx.get('amount', 'N/A')} {tx.get('currency', 'N/A')}\n"
+        cobol_output += f"====================\n"
+    
+    # Create a bytes buffer to simulate a file (you can save it to a physical file as well)
+    cobol_file = io.BytesIO()
+    cobol_file.write(cobol_output.encode('utf-8'))
+    cobol_file.seek(0)  # Move the cursor to the start of the file
+    
+    # Return the file as a downloadable response
+    return send_file(
+        cobol_file, as_attachment=True, 
+        download_name="transaction_report.txt", mimetype='text/plain'
+    )
+
 
 
 # CRUD ROUTES #
